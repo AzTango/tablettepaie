@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>FEDERAL | OS V12.9 SECURE</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&family=JetBrains+Mono:wght@500;700&display=swap');
+        :root { --accent: #3b82f6; --bg: #09090b; --sidebar: #0f1014; --card: #18181b; --border: rgba(255, 255, 255, 0.08); --text: #fafafa; --text-muted: #a1a1aa; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --gold: #facc15; --purple: #a855f7; }
+        * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+
+        /* SYSTEME DE LOGIN */
+        #login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .login-box { background: var(--card); padding: 40px; border-radius: 24px; border: 1px solid var(--border); width: 350px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        
+        aside { width: 260px; background: var(--sidebar); border-right: 1px solid var(--border); padding: 30px 20px; display: flex; flex-direction: column; flex-shrink: 0; }
+        .job-selector { background: #000; color: var(--accent); border: 1px solid var(--accent); padding: 12px; border-radius: 12px; width: 100%; margin-bottom: 25px; font-weight: 800; text-transform: uppercase; cursor: pointer; outline: none; }
+        .nav-link { display: flex; align-items: center; gap: 12px; padding: 12px 15px; color: var(--text-muted); border-radius: 12px; cursor: pointer; margin-bottom: 5px; font-weight: 600; transition: 0.2s; }
+        .nav-link.active { background: var(--accent); color: white; }
+        
+        main { flex: 1; padding: 40px; overflow-y: auto; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+        .kpi-card { background: var(--card); border: 1px solid var(--border); padding: 20px; border-radius: 16px; border-top: 3px solid var(--accent); }
+        .kpi-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; }
+        .kpi-value { display: block; font-size: 1.1rem; font-weight: 800; font-family: 'JetBrains Mono'; margin-top: 5px; }
+        .content-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 25px; margin-bottom: 20px; }
+        
+        .view { display: none; }
+        .view.active { display: block; animation: fadeIn 0.3s ease; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { text-align: left; padding: 12px 8px; color: var(--text-muted); font-size: 0.65rem; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.5px; }
+        td { padding: 12px 8px; border-bottom: 1px solid var(--border); font-size: 0.8rem; vertical-align: middle; }
+        
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
+        input, select { background: #000; border: 1px solid var(--border); color: white; padding: 12px; border-radius: 10px; outline: none; width: 100%; font-size: 0.8rem; }
+        .btn { padding: 12px 20px; border-radius: 10px; border: none; font-weight: 700; cursor: pointer; transition: 0.2s; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-success { background: var(--success); color: white; width: 100%; }
+        .btn-danger { background: var(--danger); color: white; }
+        .del-btn { color: var(--danger); background: none; border: none; cursor: pointer; font-weight: 800; font-size: 1rem; }
+        
+        .admin-only { display: none; }
+        body.is-admin .admin-only { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2 style="color:var(--accent); margin:0 0 10px 0">FEDERAL ACCESS</h2>
+            <p style="color:var(--text-muted); font-size: 0.8rem; margin-bottom: 20px">Veuillez entrer votre code d'accès</p>
+            <input type="password" id="passInput" placeholder="Code secret..." style="text-align:center; margin-bottom:15px; font-size: 1.2rem">
+            <button class="btn btn-primary" style="width:100%" onclick="checkLogin()">CONNEXION</button>
+            <p id="loginError" style="color:var(--danger); font-size:0.7rem; margin-top:10px; display:none">CODE INCORRECT</p>
+        </div>
+    </div>
+
+    <aside id="sidebar-ui" style="display:none">
+        <div style="font-weight: 900; margin-bottom: 25px; font-size: 1.4rem; color: var(--accent);">FEDERAL OS</div>
+        
+        <div class="admin-only">
+            <select class="job-selector" id="currentJobSelect" onchange="changeJob(this.value)"></select>
+        </div>
+        <div id="job-name-badge" style="display:none; background:var(--accent); color:white; padding:10px; border-radius:10px; text-align:center; font-weight:800; margin-bottom:20px; text-transform:uppercase"></div>
+
+        <div class="nav-link active" id="btn-rh" onclick="switchTab('rh')">👥 Effectifs</div>
+        <div class="nav-link" id="btn-pay" onclick="switchTab('pay')">💵 Saisie Paies</div>
+        <div class="nav-link" id="btn-arch" onclick="switchTab('arch')">📁 Archives</div>
+        <div class="nav-link admin-only" id="btn-config" style="margin-top:20px; color: var(--warning)" onclick="switchTab('config')">⚙️ Configuration</div>
+        
+        <button class="btn" style="margin-top:auto; background:rgba(239, 68, 68, 0.1); color:var(--danger)" onclick="logout()">Déconnexion</button>
+    </aside>
+
+    <main id="main-ui" style="display:none">
+        <div class="kpi-grid">
+            <div class="kpi-card"><span class="kpi-label">Sorties (Session)</span><span id="k-total" class="kpi-value" style="color:var(--danger)">0$</span></div>
+            <div class="kpi-card"><span class="kpi-label">Production</span><span id="k-ca" class="kpi-value">0$</span></div>
+            <div class="kpi-card" style="border-top-color: var(--gold)"><span class="kpi-label">Trésorerie Banque</span><span id="k-bank" class="kpi-value" style="color:var(--gold)">0$</span></div>
+            <div class="kpi-card"><span class="kpi-label">Mode Actif</span><span id="k-mode-disp" class="kpi-value" style="font-size: 0.75rem; color: var(--accent)">-</span></div>
+        </div>
+
+        <div id="v-rh" class="view active">
+            <div class="content-card">
+                <h3>Gestion du Personnel</h3>
+                <div class="form-grid">
+                    <input type="text" id="eName" placeholder="Prénom Nom">
+                    <input type="text" id="eId" placeholder="Matricule">
+                    <input type="text" id="eDiscord" placeholder="Discord">
+                    <input type="text" id="eTel" placeholder="Numéro Tél">
+                    <input type="text" id="eFlash" placeholder="ID Flashline">
+                    <input type="text" id="eBank" placeholder="RIB Bancaire">
+                    <select id="eRankSelect"></select>
+                    <button class="btn btn-primary" onclick="addEmp()">Enrôler</button>
+                </div>
+                <table>
+                    <thead><tr><th>Identité / Grade</th><th>Contacts</th><th>Infos Admin</th><th>Salaire & Objectifs</th><th>Action</th></tr></thead>
+                    <tbody id="t-emp"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="v-pay" class="view">
+            <div class="content-card">
+                <h3>Saisie de l'Activité</h3>
+                <div class="form-grid">
+                    <select id="pSelect"></select>
+                    <input type="number" id="pMainValue" placeholder="Prod (h ou $)">
+                    <input type="number" id="pBonusMan" placeholder="Prime Manuelle ($)">
+                    <button class="btn btn-primary" onclick="addPay()">Valider Paie</button>
+                </div>
+                
+                <h4 style="margin-top:30px; border-top: 1px solid var(--border); padding-top:20px">Transfert / Frais Entreprise</h4>
+                <div class="form-grid" style="grid-template-columns: 2fr 1fr 1fr 1fr">
+                    <input type="text" id="expLabel" placeholder="Motif (ex: Achat matériel)">
+                    <input type="number" id="expAmount" placeholder="Montant ($)">
+                    <select id="expTarget"></select>
+                    <button class="btn btn-danger" onclick="addExpense()">Payer / Transférer</button>
+                </div>
+
+                <h4 style="margin-top:30px">Tableau de session</h4>
+                <table>
+                    <thead><tr><th>Agent / Motif</th><th>Saisie</th><th>Objectif</th><th>Primes</th><th>Net à Payer</th><th>Action</th></tr></thead>
+                    <tbody id="t-pay"></tbody>
+                </table>
+                <div id="preview-box" style="margin-top:20px; padding:15px; background:rgba(250, 204, 21, 0.1); border-radius:12px; border:1px solid var(--gold)">
+                    <span style="color:var(--gold); font-weight:700">📈 PRÉVISIONNEL BANQUE :</span> <span id="preview-val">0$</span>
+                </div>
+                <button class="btn btn-success" style="margin-top:20px; height:50px" onclick="archiveWeek()">CLÔTURER LA SESSION</button>
+            </div>
+        </div>
+
+        <div id="v-arch" class="view">
+            <div class="content-card">
+                <h3>Historique & Audit</h3>
+                <div id="arch-list"></div>
+            </div>
+        </div>
+
+        <div id="v-config" class="view">
+            <div class="content-card">
+                <h3>Configuration Globale</h3>
+                <div class="form-grid">
+                    <input type="text" id="newJobName" placeholder="Nom Entreprise">
+                    <input type="text" id="newJobCode" placeholder="Code Accès (ex: SASP123)">
+                    <select id="newJobMode">
+                        <option value="HOURLY">🔵 MODE HORAIRE</option>
+                        <option value="QUOTA">🟣 MODE CA PERSONNEL</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="createNewJob()">Créer</button>
+                </div>
+                <div style="background:rgba(59, 130, 246, 0.1); padding:20px; border-radius:15px; border:1px solid var(--accent); margin-bottom:25px">
+                    <h4 style="margin:0 0 10px 0">Sécurité du service : ${currentJob}</h4>
+                    <label style="font-size:0.7rem; color:var(--text-muted)">MODIFIER LE CODE D'ACCÈS :</label>
+                    <input type="text" id="editJobCode" onchange="updateJobCode(this.value)" style="margin-top:5px">
+                </div>
+                <div style="background:rgba(250, 204, 21, 0.05); padding:20px; border-radius:15px; border:1px solid var(--gold); margin-bottom:25px">
+                    <h4 style="color:var(--gold); margin:0">Trésorerie Actuelle : <span id="conf-bank">0$</span></h4>
+                    <div class="form-grid" style="margin-top:10px">
+                        <input type="number" id="manualBank" placeholder="Ajuster le solde">
+                        <button class="btn btn-primary" style="background:var(--gold); color:black" onclick="adjBank()">Mise à jour</button>
+                    </div>
+                </div>
+                <h4>Grades</h4>
+                <div class="form-grid">
+                    <input type="text" id="newGradeName" placeholder="Grade">
+                    <input type="number" id="newGradeMax" placeholder="Salaire Max">
+                    <input type="number" id="newGradeMult" placeholder="Coeff (Mode CA)">
+                    <button class="btn btn-success" onclick="addGrade()">Ajouter</button>
+                </div>
+                <div id="grade-display" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:10px"></div>
+                <button class="btn btn-danger" style="margin-top:40px; opacity:0.3" onclick="deleteJob()">Supprimer le service</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const MASTER_CODE = "ADMIN123";
+        let DATA = JSON.parse(localStorage.getItem('FED_V128_DATA')) || {
+            "LSPD": { mode: "HOURLY", emps: [], pays: [], arch: [], grades: [{n:"Officier", max:50000, mult:1}], bank: 1000000, code: "LSPD75" }
+        };
+        let currentJob = localStorage.getItem('FED_V128_CUR') || "LSPD";
+        let userRole = sessionStorage.getItem('FED_USER_ROLE') || null;
+
+        function checkLogin() {
+            const val = document.getElementById('passInput').value;
+            if(val === MASTER_CODE) {
+                userRole = 'admin';
+                sessionStorage.setItem('FED_USER_ROLE', 'admin');
+                initUI();
+            } else {
+                for(let j in DATA) {
+                    if(DATA[j].code === val) {
+                        userRole = 'job';
+                        currentJob = j;
+                        sessionStorage.setItem('FED_USER_ROLE', 'job');
+                        initUI();
+                        return;
+                    }
+                }
+                document.getElementById('loginError').style.display = 'block';
+            }
+        }
+
+        function initUI() {
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('sidebar-ui').style.display = 'flex';
+            document.getElementById('main-ui').style.display = 'block';
+            
+            if(userRole === 'admin') {
+                document.body.classList.add('is-admin');
+                document.getElementById('job-name-badge').style.display = 'none';
+            } else {
+                document.body.classList.remove('is-admin');
+                document.getElementById('job-name-badge').innerText = currentJob;
+                document.getElementById('job-name-badge').style.display = 'block';
+            }
+            renderAll();
+        }
+
+        function logout() { sessionStorage.clear(); location.reload(); }
+        function save() { localStorage.setItem('FED_V128_DATA', JSON.stringify(DATA)); localStorage.setItem('FED_V128_CUR', currentJob); renderAll(); }
+        function switchTab(t) { document.querySelectorAll('.view, .nav-link').forEach(v => v.classList.remove('active')); document.getElementById('v-'+t).classList.add('active'); document.getElementById('btn-'+t).classList.add('active'); }
+        function changeJob(n) { currentJob = n; save(); }
+        function updateJobCode(v) { if(v) { DATA[currentJob].code = v; save(); } }
+
+        function createNewJob() { 
+            const n = document.getElementById('newJobName').value.trim().toUpperCase(); 
+            const c = document.getElementById('newJobCode').value.trim() || "CODE123";
+            if(n && !DATA[n]) { 
+                DATA[n] = { mode: document.getElementById('newJobMode').value, emps: [], pays: [], arch: [], grades: [], bank: 0, code: c }; 
+                currentJob = n; save(); 
+            } 
+        }
+
+        function deleteJob() { if(confirm("Supprimer ce service ?")) { delete DATA[currentJob]; currentJob = Object.keys(DATA)[0] || "LSPD"; save(); } }
+
+        function addGrade() {
+            const n = document.getElementById('newGradeName').value, m = parseInt(document.getElementById('newGradeMax').value), x = parseFloat(document.getElementById('newGradeMult').value) || 1;
+            if(n && m) { DATA[currentJob].grades.push({ n, max: m, mult: x }); save(); }
+        }
+
+        function addEmp() {
+            const job = DATA[currentJob]; const gI = document.getElementById('eRankSelect').value;
+            if(!document.getElementById('eName').value || gI==="") return;
+            const g = job.grades[gI];
+            job.emps.push({ 
+                name: document.getElementById('eName').value, id: document.getElementById('eId').value || '-',
+                discord: document.getElementById('eDiscord').value || '-', tel: document.getElementById('eTel').value || '-',
+                flash: document.getElementById('eFlash').value || '-', bankAcc: document.getElementById('eBank').value || '-',
+                gMax: g.max, gMult: g.mult, gName: g.n 
+            });
+            save();
+        }
+
+        function addPay() {
+            const job = DATA[currentJob], idx = document.getElementById('pSelect').value, val = parseFloat(document.getElementById('pMainValue').value) || 0, bMan = parseFloat(document.getElementById('pBonusMan').value) || 0;
+            if(idx==="") return; const e = job.emps[idx];
+            let payBase = 0, bAuto = 0, quota = e.gMax * e.gMult;
+            if(job.mode === "HOURLY") {
+                payBase = Math.round(e.gMax * Math.min(val/35, 1));
+                if(val > 35) bAuto = Math.min(15000, Math.round((val-35)*(e.gMax/35)));
+            } else {
+                payBase = Math.round(e.gMax * Math.min(val/quota, 1));
+                if(val > quota) bAuto = Math.min(15000, Math.round((val-quota)*0.10));
+            }
+            job.pays.push({ type: 'PAY', name: e.name, prod: val, pay: payBase+bAuto+bMan, bAuto: bAuto, bMan: bMan, quota: job.mode==='HOURLY'?35:quota, rank: e.gName });
+            save();
+        }
+
+        function addExpense() {
+            const job = DATA[currentJob], label = document.getElementById('expLabel').value, amt = parseFloat(document.getElementById('expAmount').value) || 0, target = document.getElementById('expTarget').value;
+            if(!label || amt <= 0) return;
+            job.pays.push({ type: 'EXPENSE', name: label, prod: 0, pay: amt, bAuto: 0, bMan: 0, quota: 0, rank: target === 'EXTERNAL' ? 'FRAIS EXTERNE' : `VIREMENT -> ${target}`, transferTo: target !== 'EXTERNAL' ? target : null });
+            document.getElementById('expLabel').value = ""; document.getElementById('expAmount').value = "";
+            save();
+        }
+
+        function archiveWeek() {
+            const job = DATA[currentJob]; if(!job.pays.length) return;
+            job.pays.forEach(p => { if(p.type === 'EXPENSE' && p.transferTo && DATA[p.transferTo]) DATA[p.transferTo].bank += p.pay; });
+            const totalOut = job.pays.reduce((s,p)=>s+p.pay, 0);
+            const totalIn = job.pays.reduce((s,p)=>s+p.prod, 0);
+            const profit = job.mode === 'QUOTA' ? (totalIn - totalOut) : -totalOut;
+            job.bank += profit;
+            job.arch.unshift({ id: Date.now(), date: new Date().toLocaleString(), totalPay: totalOut, totalProd: totalIn, profit: profit, mode: job.mode, details: JSON.parse(JSON.stringify(job.pays)) });
+            job.pays = []; save(); switchTab('arch');
+        }
+
+        function deleteArchive(id) {
+            const job = DATA[currentJob];
+            const arcIdx = job.arch.findIndex(a => a.id === id);
+            if(arcIdx === -1) return;
+            if(confirm("Supprimer l'archive ?")) {
+                job.bank -= job.arch[arcIdx].profit;
+                job.arch.splice(arcIdx, 1);
+                save();
+            }
+        }
+
+        function adjBank() { const v = parseFloat(document.getElementById('manualBank').value); if(!isNaN(v)) { DATA[currentJob].bank = v; save(); } }
+
+        function renderAll() {
+            const job = DATA[currentJob]; if(!job) return;
+            const isQ = job.mode === "QUOTA";
+            const tp = job.pays.reduce((s,p)=>s+p.pay, 0);
+            const tc = job.pays.reduce((s,p)=>s+p.prod, 0);
+
+            document.getElementById('k-bank').innerText = (job.bank || 0).toLocaleString() + "$";
+            document.getElementById('conf-bank').innerText = (job.bank || 0).toLocaleString() + "$";
+            document.getElementById('k-total').innerText = tp.toLocaleString() + "$";
+            document.getElementById('k-ca').innerText = tc.toLocaleString() + (isQ ? "$" : "h");
+            document.getElementById('k-mode-disp').innerText = isQ ? "CA PERSONNEL" : "MODE HORAIRE";
+            document.getElementById('editJobCode').value = job.code || "";
+            
+            document.getElementById('currentJobSelect').innerHTML = Object.keys(DATA).map(j => `<option value="${j}" ${j===currentJob?'selected':''}>${j}</option>`).join('');
+            document.getElementById('eRankSelect').innerHTML = (job.grades || []).map((g,i) => `<option value="${i}">${g.n}</option>`).join('');
+            document.getElementById('pSelect').innerHTML = job.emps.map((e,i) => job.pays.find(p=>p.name===e.name)?'':`<option value="${i}">${e.name}</option>`).join('');
+            document.getElementById('expTarget').innerHTML = `<option value="EXTERNAL">Facture Externe</option>` + Object.keys(DATA).filter(name => name !== currentJob).map(name => `<option value="${name}">${name}</option>`).join('');
+
+            document.getElementById('t-emp').innerHTML = job.emps.map((e,idx) => `
+                <tr>
+                    <td><div class="data-row"><b>${e.name}</b><span class="sub-data" style="color:var(--accent)">${e.gName} <small>(#${e.id})</small></span></div></td>
+                    <td><div class="data-row"><span class="sub-data"><span class="sub-label">DC:</span> ${e.discord}</span><span class="sub-data"><span class="sub-label">TEL:</span> ${e.tel}</span></div></td>
+                    <td><div class="data-row"><span class="sub-data"><span class="sub-label">RIB:</span> ${e.bankAcc}</span><span class="sub-data"><span class="sub-label">FL:</span> ${e.flash}</span></div></td>
+                    <td><div class="data-row"><span class="sub-data" style="color:var(--success)">Max: ${e.gMax.toLocaleString()}$</span><span class="sub-data">Obj: ${isQ ? (e.gMax*e.gMult).toLocaleString()+'$' : '35h'}</span></div></td>
+                    <td><button class="del-btn" onclick="DATA[currentJob].emps.splice(${idx},1);save()">✖</button></td>
+                </tr>`).join('');
+
+            document.getElementById('t-pay').innerHTML = job.pays.map((p,idx) => `
+                <tr style="${p.type==='EXPENSE'?'color:var(--danger)':''}">
+                    <td><b>${p.name}</b><br><small>${p.rank}</small></td>
+                    <td>${p.prod}${isQ?'$':'h'}</td>
+                    <td>${p.type==='PAY' ? p.quota+(isQ?'$':'h') : '-'}</td>
+                    <td>${p.type==='PAY' ? `+${(p.bAuto+p.bMan).toLocaleString()}$` : '<span style="color:var(--gold)">TRANSFERT</span>'}</td>
+                    <td style="font-weight:800; color:${p.type==='EXPENSE'?'var(--danger)':'var(--success)'}">${p.pay.toLocaleString()}$</td>
+                    <td><button class="del-btn" onclick="DATA[currentJob].pays.splice(${idx},1);save()">✖</button></td>
+                </tr>`).join('');
+
+            const estimatedProfit = isQ ? (tc - tp) : -tp;
+            document.getElementById('preview-val').innerText = (job.bank + estimatedProfit).toLocaleString() + "$";
+
+            document.getElementById('arch-list').innerHTML = job.arch.map(a => `
+                <div class="archive-item">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px">
+                        <div><span style="font-size:1.1rem; font-weight:800; color:var(--accent)">${a.date}</span><br><span class="badge">${a.mode}</span></div>
+                        <div style="text-align:right"><span style="color:var(--danger)">Sorties: ${a.totalPay.toLocaleString()}$</span><br><b style="color:var(--gold)">Impact Tréso: ${a.profit.toLocaleString()}$</b></div>
+                    </div>
+                    <table style="background:rgba(0,0,0,0.2); border-radius:10px; font-size:0.8rem">
+                        <thead><tr><th>Agent / Motif</th><th>Grade</th><th>Prod.</th><th>Objectif</th><th>Primes</th><th style="text-align:right">Total</th></tr></thead>
+                        <tbody>${a.details.map(d => `<tr><td>${d.name}</td><td>${d.rank}</td><td>${d.prod}</td><td>${d.quota}</td><td>${d.bAuto+d.bMan}$</td><td style="text-align:right; font-weight:700">${d.pay.toLocaleString()}$</td></tr>`).join('')}</tbody>
+                    </table>
+                    <div style="margin-top:10px; text-align:right"><button onclick="deleteArchive(${a.id})" class="del-btn" style="font-size:0.7rem">🗑️ SUPPRIMER</button></div>
+                </div>`).join('');
+
+            document.getElementById('grade-display').innerHTML = (job.grades || []).map((g,i) => `
+                <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:12px; border:1px solid var(--border); position:relative">
+                    <button class="del-btn" style="position:absolute; top:5px; right:8px" onclick="DATA[currentJob].grades.splice(${i},1);save()">✖</button>
+                    <b style="color:var(--accent)">${g.n}</b><br><small>Base: ${g.max.toLocaleString()}$</small><br><small>Coef: x${g.mult}</small>
+                </div>`).join('');
+        }
+        
+        if(sessionStorage.getItem('FED_USER_ROLE')) initUI();
+    </script>
+</body>
+</html>
